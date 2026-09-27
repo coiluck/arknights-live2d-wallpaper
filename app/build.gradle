@@ -1,0 +1,62 @@
+plugins {
+    id 'com.android.application'
+}
+
+// spine-libgdx 3.8.99.1 is built against libGDX 1.10.0, so pin the same version.
+def gdxVersion = '1.10.0'
+def spineVersion = '3.8.99.1'
+
+android {
+    namespace 'moe.coiluck.spinewallpaper'
+    compileSdk 35
+
+    defaultConfig {
+        applicationId 'moe.coiluck.spinewallpaper'
+        minSdk 24
+        targetSdk 35
+        versionCode 1
+        versionName '0.1'
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_11
+        targetCompatibility JavaVersion.VERSION_11
+    }
+
+    // libGDX native libraries (.so) are extracted here by copyAndroidNatives.
+    sourceSets.main.jniLibs.srcDirs = ['libs']
+}
+
+configurations { natives }
+
+dependencies {
+    implementation "com.badlogicgames.gdx:gdx:$gdxVersion"
+    implementation "com.badlogicgames.gdx:gdx-backend-android:$gdxVersion"
+    implementation "com.esotericsoftware.spine:spine-libgdx:$spineVersion"
+
+    natives "com.badlogicgames.gdx:gdx-platform:$gdxVersion:natives-armeabi-v7a"
+    natives "com.badlogicgames.gdx:gdx-platform:$gdxVersion:natives-arm64-v8a"
+    natives "com.badlogicgames.gdx:gdx-platform:$gdxVersion:natives-x86"
+    natives "com.badlogicgames.gdx:gdx-platform:$gdxVersion:natives-x86_64"
+}
+
+// Unpacks libgdx.so for each ABI from the natives jars into app/libs/<abi>/.
+tasks.register('copyAndroidNatives') {
+    def nativeJars = configurations.natives
+    def libsDir = file('libs')
+    doFirst {
+        nativeJars.files.each { jar ->
+            def abi = ['armeabi-v7a', 'arm64-v8a', 'x86_64', 'x86'].find { jar.name.endsWith("natives-${it}.jar") }
+            if (abi != null) {
+                project.copy {
+                    from zipTree(jar)
+                    into new File(libsDir, abi)
+                    include '*.so'
+                }
+            }
+        }
+    }
+}
+tasks.matching { it.name.contains('merge') && it.name.contains('JniLibFolders') }.configureEach {
+    it.dependsOn 'copyAndroidNatives'
+}
